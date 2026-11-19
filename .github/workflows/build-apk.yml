@@ -36,13 +36,35 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build APK
-        working-directory: StudyTrackerAndroid
-        run: gradle --no-daemon assembleDebug
+      - name: Find Project and Build APK
+        shell: bash
+        run: |
+          PROJECT_DIR=$(find . -type f \( -name settings.gradle -o -name settings.gradle.kts \) -not -path '*/.gradle/*' -print -quit | xargs -r dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: settings.gradle not found!"
+            echo "Repository files:"
+            ls -la
+            exit 1
+          fi
+
+          echo "Project found at: $PROJECT_DIR"
+
+          gradle -p "$PROJECT_DIR" --no-daemon assembleDebug
+
+          APK_PATH=$(find "$PROJECT_DIR" -type f -path '*/build/outputs/apk/debug/*.apk' -print -quit)
+
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: APK file not found!"
+            exit 1
+          fi
+
+          echo "APK_PATH=$APK_PATH" >> "$GITHUB_ENV"
+          echo "APK successfully built: $APK_PATH"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: StudyTrackerV3-APK
-          path: StudyTrackerAndroid/app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
